@@ -19,6 +19,8 @@ WORKDIR /workspace/stable-diffusion-webui
 RUN python3 -m venv venv
 RUN . venv/bin/activate && \
     pip install --upgrade pip && \
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
+    pip install xformers && \
     pip install -r requirements.txt && \
     pip install insightface && \
     pip install runpod requests
@@ -36,13 +38,11 @@ RUN wget -O extensions/sd-webui-controlnet/models/ip-adapter_instant_id_sdxl.bin
 RUN wget -O extensions/sd-webui-controlnet/models/control_instant_id_sdxl.safetensors "https://huggingface.co/OreX/ControlNet/resolve/main/control_instant_id_sdxl.safetensors"
 RUN wget -O extensions/sd-webui-controlnet/models/ip-adapter-plus_sdxl_vit-h.safetensors "https://huggingface.co/OreX/ControlNet/resolve/main/ip-adapter-plus_sdxl_vit-h.safetensors"
 
-ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --no-half-vae --xformers --api"
+ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --no-half-vae --opt-sdp-attention --api"
 
 # 2) worker
 WORKDIR /workspace
 COPY src/handler.py .
 
 # Одним процессом: webui в фоне + worker
-# CMD ["python", "-u", "handler.py"]
-# Запускаем handler.py используя python из venv stable-diffusion-webui
 CMD ["/workspace/stable-diffusion-webui/venv/bin/python", "-u", "handler.py"]
