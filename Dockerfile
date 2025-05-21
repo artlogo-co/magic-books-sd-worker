@@ -35,6 +35,21 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements_versions.txt && \
     python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test
 
+
+# Install ControlNet extension
+RUN git clone https://github.com/Mikubill/sd-webui-controlnet.git extensions/sd-webui-controlnet
+
+# Download SDXL model
+RUN mkdir -p models/Stable-diffusion && \
+    wget -O models/Stable-diffusion/realvisxlV50_v40Bakedvae.safetensors "https://civitai.com/api/download/models/344487?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+
+# Download ControlNet models
+RUN mkdir -p extensions/sd-webui-controlnet/models && \
+    wget -O extensions/sd-webui-controlnet/models/ip-adapter_instant_id_sdxl.bin "https://huggingface.co/OreX/ControlNet/resolve/main/ip-adapter_instant_id_sdxl.bin" && \
+    wget -O extensions/sd-webui-controlnet/models/control_instant_id_sdxl.safetensors "https://huggingface.co/OreX/ControlNet/resolve/main/control_instant_id_sdxl.safetensors" && \
+    wget -O extensions/sd-webui-controlnet/models/ip-adapter-plus_sdxl_vit-h.safetensors "https://huggingface.co/OreX/ControlNet/resolve/main/ip-adapter-plus_sdxl_vit-h.safetensors"
+
+
 COPY --from=download /model.safetensors /model.safetensors
 
 # install dependencies

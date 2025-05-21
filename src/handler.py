@@ -39,7 +39,7 @@ def run_inference(inference_request):
     """
     Run inference on a request.
     """
-    response = automatic_session.post(url=f'{LOCAL_URL}/txt2img',
+    response = automatic_session.post(url=f'{LOCAL_URL}/img2img',
                                       json=inference_request, timeout=600)
     return response.json()
 
