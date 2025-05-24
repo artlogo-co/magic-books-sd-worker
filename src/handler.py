@@ -56,28 +56,8 @@ def start_webui() -> None:
 
 # ───────────────────────────────── handler ───────────────────────────────────
 def handler(job: Dict[str, Any]):
-    j = job["input"]
     try:
-        payload = {
-            "init_images": [j["init_image"]],
-            "mask": j["mask_image"],
-            "prompt": j.get("prompt", ""),
-            "negative_prompt": j.get("negative_prompt", ""),
-            "seed": j.get("seed", -1),
-            "steps": j.get("steps", 30),
-            "cfg_scale": j.get("cfg_scale", 7.0),
-            "width": 1016,
-            "height": 1016,
-            "sampler_name": "Euler a",
-            "scheduler": "SGM Uniform",
-            "denoising_strength": 1,
-            "override_settings": {
-                "sd_model_checkpoint": "realvisxlV50_v40Bakedvae"
-            },
-            "alwayson_scripts": {
-                "ControlNet": j["controlnet"],
-            },
-        }
+        payload = job["input"]
 
         r = sd_session.post(f"{SD_WEBUI_URL}/sdapi/v1/img2img", json=payload, timeout=300)
         r.raise_for_status()
