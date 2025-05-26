@@ -62,7 +62,7 @@ def handler(job: Dict[str, Any]):
         r = sd_session.post(f"{SD_WEBUI_URL}/sdapi/v1/img2img", json=payload, timeout=300)
         r.raise_for_status()
 
-        return {"generated_image": r.json()["images"][0]}
+        return r.json()
     except Exception as e:
         return {"error": str(e)}
 
