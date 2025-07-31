@@ -27,17 +27,22 @@ def wait_for_service() -> None:
     retries = 0
     while True:
         try:
-            response = sd_session.get(f"{SD_WEBUI_URL}/docs", timeout=120)
+            response = sd_session.get(f"{SD_WEBUI_URL}/sdapi/v1/sd-models", timeout=120)
             if response.status_code == 200:
-                print("WebUI API Service is ready!")
-                return
+                try:
+                    models = response.json()
+                    if isinstance(models, list):
+                        print("WebUI API Service is ready!")
+                        return
+                except ValueError:
+                    pass
         except requests.exceptions.RequestException:
             retries += 1
-            if retries % 15 == 0:  # Log every 15 retries to avoid spam
-                print("Service not ready yet. Retrying...")
+            if retries % 15 == 0:
+                print(f"Service not ready yet. Retry #{retries}...")
         except Exception as err:
             print(f"Error while waiting for service: {err}")
-        time.sleep(0.2)
+        time.sleep(1 if retries > 30 else 0.2)
 
 def start_webui() -> None:
     """
@@ -54,20 +59,39 @@ def start_webui() -> None:
     )
     wait_for_service()
 
+def try_request_with_retries(payload, max_retries=2, delay_ms=20):
+    """
+    Try to make the request with specified number of retries and delay between attempts.
+    """
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            if attempt > 0:
+                time.sleep(delay_ms / 1000)
+                
+            response = sd_session.post(f"{SD_WEBUI_URL}/sdapi/v1/img2img", json=payload, timeout=300)
+            response.raise_for_status()
+            return response.json()
+            
+        except Exception as e:
+            last_error = e
+            print(f"Attempt {attempt + 1} failed: {str(e)}")
+    
+    raise last_error
+
 # ───────────────────────────────── handler ───────────────────────────────────
 def handler(job: Dict[str, Any]):
     try:
+        wait_for_service()
         payload = job["input"]
-
-        r = sd_session.post(f"{SD_WEBUI_URL}/sdapi/v1/img2img", json=payload, timeout=300)
-        r.raise_for_status()
-
-        return r.json()
+        
+        return try_request_with_retries(payload)
+        
     except Exception as e:
         return {"error": str(e)}
 
-# Initialize the service before starting the handler
+
 if __name__ == "__main__":
-    start_webui()  # This will also wait for the service to be ready
+    start_webui()
     print("Starting RunPod worker...")
     runpod.serverless.start({"handler": handler})
