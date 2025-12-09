@@ -129,8 +129,8 @@ def handler(job: Dict[str, Any]):
         
         response = try_request_with_retries(payload)
 
-        if "images" in response:
-            response["images"] = upload_images_to_s3(response["images"])
+        if "images" in response and response["images"]:
+            response["images"] = upload_images_to_s3([response["images"][0]])
 
         return response
         
