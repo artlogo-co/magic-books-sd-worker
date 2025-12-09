@@ -2,18 +2,26 @@ import base64
 import os
 import subprocess
 import time
-from typing import Dict, Any
+from typing import Any, Dict
+from uuid import uuid4
 
+import boto3
 import requests
 from requests.adapters import HTTPAdapter, Retry
 import runpod
 
 SD_WEBUI_URL = "http://127.0.0.1:7860"
+AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
+AWS_S3_PREFIX = os.getenv("AWS_S3_PREFIX", "")
+AWS_S3_URL_EXPIRY = int(os.getenv("AWS_S3_URL_EXPIRY", "3600"))
+AWS_S3_ENDPOINT = os.getenv("AWS_S3_ENDPOINT")
 
 # Create a session with retries
 sd_session = requests.Session()
 retries = Retry(total=10, backoff_factor=0.1, status_forcelist=[502, 503, 504])
 sd_session.mount('http://', HTTPAdapter(max_retries=retries))
+s3_client_kwargs = {"endpoint_url": AWS_S3_ENDPOINT} if AWS_S3_ENDPOINT else {}
+s3_client = boto3.client("s3", **s3_client_kwargs)
 
 # ───────────────────────────────── helpers ────────────────────────────────────
 def encode(b: bytes) -> str:
@@ -79,13 +87,52 @@ def try_request_with_retries(payload, max_retries=2, delay_ms=20):
     
     raise last_error
 
+
+def upload_images_to_s3(images):
+    if not AWS_S3_BUCKET:
+        raise RuntimeError("AWS_S3_BUCKET env var is required to upload images")
+
+    prefix = AWS_S3_PREFIX.strip("/")
+    urls = []
+
+    for image_b64 in images:
+        payload = image_b64.split(",", 1)[1] if "," in image_b64 else image_b64
+        data = base64.b64decode(payload)
+
+        object_key = f"{uuid4()}.png"
+        if prefix:
+            object_key = f"{prefix}/{object_key}"
+
+        s3_client.put_object(
+            Bucket=AWS_S3_BUCKET,
+            Key=object_key,
+            Body=data,
+            ContentType="image/png",
+        )
+
+        urls.append(
+            s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": AWS_S3_BUCKET, "Key": object_key},
+                ExpiresIn=AWS_S3_URL_EXPIRY,
+            )
+        )
+
+    return urls
+
+
 # ───────────────────────────────── handler ───────────────────────────────────
 def handler(job: Dict[str, Any]):
     try:
         wait_for_service()
         payload = job["input"]
         
-        return try_request_with_retries(payload)
+        response = try_request_with_retries(payload)
+
+        if "images" in response:
+            response["images"] = upload_images_to_s3(response["images"])
+
+        return response
         
     except Exception as e:
         return {"error": str(e)}
