@@ -23,7 +23,9 @@ RUN . venv/bin/activate && \
     pip install xformers && \
     pip install -r requirements.txt && \
     pip install insightface && \
-    pip install runpod requests
+    pip install runpod requests && \
+    pip install "numpy>=1.21.0,<2.0.0" && \
+    pip install --force-reinstall --no-cache-dir scikit-image
 
 # Установка ControlNet расширения
 RUN git clone https://github.com/Mikubill/sd-webui-controlnet.git extensions/sd-webui-controlnet
