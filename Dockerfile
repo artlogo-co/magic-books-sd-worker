@@ -44,7 +44,9 @@ ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --no-half-vae 
 # 2) worker
 WORKDIR /workspace
 COPY requirements.txt /workspace/requirements.txt
+COPY test_input.json .
 COPY src/handler.py .
+COPY src/start.sh .
 
-# Одним процессом: webui в фоне + worker
-CMD ["/workspace/stable-diffusion-webui/venv/bin/python", "-u", "handler.py"]
+RUN chmod +x /workspace/start.sh
+CMD ["/workspace/start.sh"]

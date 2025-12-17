@@ -109,7 +109,7 @@ markdown-it-py
 MarkupSafe
 matplotlib
 mdurl
-mediapipe
+mediapipe==0.10.9
 ml_dtypes
 mpmath
 multidict
