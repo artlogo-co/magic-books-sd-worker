@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    pkg-config \
+    libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace
 
@@ -17,15 +19,12 @@ WORKDIR /workspace
 RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
 WORKDIR /workspace/stable-diffusion-webui
 RUN python3 -m venv venv
+COPY requirements.txt /workspace/requirements.txt
 RUN . venv/bin/activate && \
     pip install --upgrade pip && \
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
-    pip install xformers && \
+    pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121 && \
     pip install -r requirements.txt && \
-    pip install insightface && \
-    pip install runpod requests && \
-    pip install "numpy>=1.21.0,<2.0.0" && \
-    pip install --force-reinstall --no-cache-dir scikit-image
+    pip install -r /workspace/requirements.txt
 
 # Установка ControlNet расширения
 RUN git clone https://github.com/Mikubill/sd-webui-controlnet.git extensions/sd-webui-controlnet
@@ -44,6 +43,7 @@ ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --no-half-vae 
 
 # 2) worker
 WORKDIR /workspace
+COPY requirements.txt /workspace/requirements.txt
 COPY src/handler.py .
 
 # Одним процессом: webui в фоне + worker

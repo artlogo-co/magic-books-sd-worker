@@ -53,9 +53,18 @@ def start_webui() -> None:
 
     os.environ["_WEBUI_STARTED"] = "1"
     print("Starting Stable Diffusion WebUI...")
+    
+    # Get command line args from environment or use defaults
+    cmd_args = os.getenv("COMMANDLINE_ARGS", "--listen --enable-insecure-extension-access --no-half-vae --opt-sdp-attention --api")
+    
+    # Use the venv python directly
+    python_path = "/workspace/stable-diffusion-webui/venv/bin/python"
+    launch_script = "/workspace/stable-diffusion-webui/launch.py"
+    
     subprocess.Popen(
-        ["bash", "-c", ". venv/bin/activate && python launch.py ${COMMANDLINE_ARGS}"],
+        [python_path, launch_script] + cmd_args.split(),
         cwd="/workspace/stable-diffusion-webui",
+        env=dict(os.environ, PYTHONUNBUFFERED="1")
     )
     wait_for_service()
 
