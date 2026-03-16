@@ -24,7 +24,7 @@ COPY requirements.txt /workspace/requirements.txt
 
 RUN . venv/bin/activate && \
     pip install --upgrade pip && \
-    pip install --upgrade setuptools wheel && \
+    pip install "setuptools==69.5.1" wheel && \
     pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
         --index-url https://download.pytorch.org/whl/cu121 && \
     pip install --no-build-isolation \
