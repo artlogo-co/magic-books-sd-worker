@@ -16,7 +16,13 @@ AWS_S3_PREFIX = os.getenv("AWS_S3_PREFIX", "")
 AWS_S3_URL_EXPIRY = int(os.getenv("AWS_S3_URL_EXPIRY", "3600"))
 AWS_S3_ENDPOINT = os.getenv("AWS_S3_ENDPOINT")
 
-# Create a session with retries
+# LCM acceleration toggle via env var (set LCM_ENABLED=1 to activate)
+LCM_ENABLED = os.getenv("LCM_ENABLED", "0") == "1"
+LCM_LORA_NAME = os.getenv("LCM_LORA_NAME", "lcm-lora-sdxl")
+LCM_LORA_WEIGHT = float(os.getenv("LCM_LORA_WEIGHT", "0.9"))
+LCM_STEPS = int(os.getenv("LCM_STEPS", "10"))
+LCM_CFG_SCALE = float(os.getenv("LCM_CFG_SCALE", "1.8"))
+
 sd_session = requests.Session()
 retries = Retry(total=10, backoff_factor=0.1, status_forcelist=[502, 503, 504])
 sd_session.mount('http://', HTTPAdapter(max_retries=retries))
@@ -27,10 +33,48 @@ s3_client = boto3.client("s3", **s3_client_kwargs)
 def encode(b: bytes) -> str:
     return base64.b64encode(b).decode()
 
+
+def apply_lcm_acceleration(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Patch payload to use LCM LoRA for faster inference.
+    Original values are preserved in '_original' keys for logging.
+    """
+    patched = payload.copy()
+
+    # --- sampler / scheduler ---
+    patched["_original_sampler"] = payload.get("sampler_name")
+    patched["_original_scheduler"] = payload.get("scheduler")
+    patched["_original_steps"] = payload.get("steps")
+    patched["_original_cfg_scale"] = payload.get("cfg_scale")
+
+    patched["sampler_name"] = "LCM"
+    patched["scheduler"] = "Karras"
+    patched["steps"] = LCM_STEPS
+    patched["cfg_scale"] = LCM_CFG_SCALE
+
+    # --- inject LCM LoRA into prompt ---
+    lora_tag = f"<lora:{LCM_LORA_NAME}:{LCM_LORA_WEIGHT}>"
+    original_prompt = payload.get("prompt", "")
+
+    if lora_tag not in original_prompt:
+        patched["prompt"] = f"{original_prompt}, {lora_tag}"
+
+    print(
+        f"[LCM] Patched payload: "
+        f"steps {patched['_original_steps']} → {LCM_STEPS}, "
+        f"cfg {patched['_original_cfg_scale']} → {LCM_CFG_SCALE}, "
+        f"sampler {patched['_original_sampler']} → LCM"
+    )
+
+    return patched
+
+
+def strip_internal_keys(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove _original_* debug keys before sending to WebUI."""
+    return {k: v for k, v in payload.items() if not k.startswith("_original")}
+
+
 def wait_for_service() -> None:
-    """
-    Check if the service is ready to receive requests.
-    """
     print("Waiting for WebUI API Service to be ready...")
     retries = 0
     while True:
@@ -52,23 +96,22 @@ def wait_for_service() -> None:
             print(f"Error while waiting for service: {err}")
         time.sleep(1 if retries > 30 else 0.2)
 
+
 def start_webui() -> None:
-    """
-    Starts AUTOMATIC1111 in the background once during worker initialization.
-    """
     if os.getenv("_WEBUI_STARTED"):
         return
 
     os.environ["_WEBUI_STARTED"] = "1"
     print("Starting Stable Diffusion WebUI...")
-    
-    # Get command line args from environment or use defaults
-    cmd_args = os.getenv("COMMANDLINE_ARGS", "--listen --enable-insecure-extension-access --no-half-vae --opt-sdp-attention --api")
-    
-    # Use the venv python directly
+
+    cmd_args = os.getenv(
+        "COMMANDLINE_ARGS",
+        "--listen --enable-insecure-extension-access --no-half-vae --opt-sdp-attention --api"
+    )
+
     python_path = "/workspace/stable-diffusion-webui/venv/bin/python"
     launch_script = "/workspace/stable-diffusion-webui/launch.py"
-    
+
     subprocess.Popen(
         [python_path, launch_script] + cmd_args.split(),
         cwd="/workspace/stable-diffusion-webui",
@@ -76,24 +119,26 @@ def start_webui() -> None:
     )
     wait_for_service()
 
+
 def try_request_with_retries(payload, max_retries=2, delay_ms=20):
-    """
-    Try to make the request with specified number of retries and delay between attempts.
-    """
     last_error = None
     for attempt in range(max_retries + 1):
         try:
             if attempt > 0:
                 time.sleep(delay_ms / 1000)
-                
-            response = sd_session.post(f"{SD_WEBUI_URL}/sdapi/v1/img2img", json=payload, timeout=300)
+
+            response = sd_session.post(
+                f"{SD_WEBUI_URL}/sdapi/v1/img2img",
+                json=payload,
+                timeout=300
+            )
             response.raise_for_status()
             return response.json()
-            
+
         except Exception as e:
             last_error = e
             print(f"Attempt {attempt + 1} failed: {str(e)}")
-    
+
     raise last_error
 
 
@@ -135,14 +180,30 @@ def handler(job: Dict[str, Any]):
     try:
         wait_for_service()
         payload = job["input"]
-        
-        response = try_request_with_retries(payload)
+
+        # --- LCM acceleration patch ---
+        if LCM_ENABLED:
+            payload = apply_lcm_acceleration(payload)
+
+        clean_payload = strip_internal_keys(payload)
+        response = try_request_with_retries(clean_payload)
 
         if "images" in response:
             response["images"] = upload_images_to_s3(response["images"])
 
+        # Attach LCM debug info to response if patched
+        if LCM_ENABLED:
+            response["_lcm_debug"] = {
+                "lcm_enabled": True,
+                "steps_used": LCM_STEPS,
+                "cfg_used": LCM_CFG_SCALE,
+                "original_steps": payload.get("_original_steps"),
+                "original_cfg": payload.get("_original_cfg_scale"),
+                "original_sampler": payload.get("_original_sampler"),
+            }
+
         return response
-        
+
     except Exception as e:
         return {"error": str(e)}
 
