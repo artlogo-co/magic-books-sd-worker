@@ -23,7 +23,8 @@ RUN python3 -m venv venv
 COPY requirements.txt /workspace/requirements.txt
 
 RUN mkdir -p /workspace/stable-diffusion-webui/venv/pip.conf.d && \
-    echo -e "[install]\nno-build-isolation = true" > /workspace/stable-diffusion-webui/venv/pip.conf
+    printf '[install]\nno-build-isolation = true\n' \
+    > /workspace/stable-diffusion-webui/venv/pip.conf
 
 RUN . venv/bin/activate && \
     pip install --upgrade pip && \
