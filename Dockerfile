@@ -17,7 +17,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /workspace
 
 # 1) WebUI + зависимости
-RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
+RUN git clone https://github.com/lllyasviel/stable-diffusion-webui-forge.git \
+    stable-diffusion-webui
 WORKDIR /workspace/stable-diffusion-webui
 
 RUN python3 -m venv venv
