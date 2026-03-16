@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     pkg-config \
     libcairo2-dev \
+    google-perftools \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -36,11 +37,9 @@ RUN . venv/bin/activate && \
 # Установка ControlNet расширения
 RUN git clone https://github.com/Mikubill/sd-webui-controlnet.git extensions/sd-webui-controlnet
 
-# Установка расширения LCM сэмплера
-RUN git clone https://github.com/0xbitches/sd-webui-lcm.git extensions/sd-webui-lcm
-
 RUN mkdir -p models/Stable-diffusion
-RUN wget -O models/Stable-diffusion/realvisxlV50_v40Bakedvae.safetensors "https://civitai.com/api/download/models/344487?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+RUN wget -O models/Stable-diffusion/realvisxlV50_v40Bakedvae.safetensors \
+    "https://civitai.com/api/download/models/344487?type=Model&format=SafeTensor&size=pruned&fp=fp16"
 
 # Загрузка моделей ControlNet
 RUN mkdir -p extensions/sd-webui-controlnet/models
@@ -56,10 +55,20 @@ RUN mkdir -p models/Lora
 RUN wget -O models/Lora/lcm-lora-sdxl.safetensors \
     "https://huggingface.co/latent-consistency/lcm-lora-sdxl/resolve/main/pytorch_lora_weights.safetensors"
 
-# opt-sdp-attention уже есть, добавляем xformers для доп. ускорения
+RUN mkdir -p models/VAE
+RUN wget -O models/VAE/sdxl-vae-fp16-fix.safetensors \
+    "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/resolve/main/sdxl.vae.safetensors"
+
 RUN . venv/bin/activate && pip install xformers==0.0.28.post1
 
-ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --no-half-vae --opt-sdp-attention --xformers --api"
+ENV PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.9,max_split_size_mb:512
+ENV COMMANDLINE_ARGS="--listen \
+    --enable-insecure-extension-access \
+    --opt-sdp-attention \
+    --opt-channelslast \
+    --xformers \
+    --vae-path /workspace/stable-diffusion-webui/models/VAE/sdxl-vae-fp16-fix.safetensors \
+    --api"
 
 # 2) worker
 WORKDIR /workspace
