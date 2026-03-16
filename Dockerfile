@@ -39,10 +39,8 @@ RUN git clone https://github.com/Mikubill/sd-webui-controlnet.git extensions/sd-
 # Установка расширения LCM сэмплера
 RUN git clone https://github.com/0xbitches/sd-webui-lcm.git extensions/sd-webui-lcm
 
-# Загрузка основной модели
 RUN mkdir -p models/Stable-diffusion
-RUN wget -O models/Stable-diffusion/dynavisionXLAllInOneStylized_releaseV0610Bakedvae.safetensors \
-    "https://civitai.com/api/download/models/XXX"  # <- вставьте ваш реальный URL
+RUN wget -O models/Stable-diffusion/realvisxlV50_v40Bakedvae.safetensors "https://civitai.com/api/download/models/344487?type=Model&format=SafeTensor&size=pruned&fp=fp16"
 
 # Загрузка моделей ControlNet
 RUN mkdir -p extensions/sd-webui-controlnet/models
