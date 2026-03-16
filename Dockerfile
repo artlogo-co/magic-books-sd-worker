@@ -65,9 +65,8 @@ RUN . venv/bin/activate && pip install xformers==0.0.28.post1
 ENV PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.9,max_split_size_mb:512
 ENV COMMANDLINE_ARGS="--listen \
     --enable-insecure-extension-access \
-    --opt-sdp-attention \
-    --opt-channelslast \
-    --xformers \
+    --cuda-malloc \
+    --torch-compile \
     --vae-path /workspace/stable-diffusion-webui/models/VAE/sdxl-vae-fp16-fix.safetensors \
     --api"
 
