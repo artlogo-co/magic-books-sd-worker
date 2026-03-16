@@ -22,13 +22,14 @@ WORKDIR /workspace/stable-diffusion-webui
 RUN python3 -m venv venv
 COPY requirements.txt /workspace/requirements.txt
 
+RUN mkdir -p /workspace/stable-diffusion-webui/venv/pip.conf.d && \
+    echo -e "[install]\nno-build-isolation = true" > /workspace/stable-diffusion-webui/venv/pip.conf
+
 RUN . venv/bin/activate && \
     pip install --upgrade pip && \
     pip install "setuptools==69.5.1" wheel && \
     pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
         --index-url https://download.pytorch.org/whl/cu121 && \
-    pip install --no-build-isolation \
-        "clip @ https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip#sha256=b5842c25da441d6c581b53a5c60e0c2127ebafe0f746f8e15561a006c6c3be6a" && \
     pip install -r requirements.txt && \
     pip install -r /workspace/requirements.txt
 
