@@ -2,7 +2,7 @@ import base64
 import os
 import subprocess
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import boto3
@@ -72,6 +72,90 @@ def apply_lcm_acceleration(payload: Dict[str, Any]) -> Dict[str, Any]:
 def strip_internal_keys(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Remove _original_* debug keys before sending to WebUI."""
     return {k: v for k, v in payload.items() if not k.startswith("_original")}
+
+
+def _extract_base64_image(value: Any) -> Optional[str]:
+    """
+    Normalize various "image" representations to the base64 string SD WebUI expects.
+
+    Forge's ControlNet implementation is stricter than A1111's extension: it expects
+    unit["image"] to be a base64 string (or null), not a nested object.
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        return value
+
+    # A1111-style: {"image": "<b64>", "mask": ...}
+    if isinstance(value, dict):
+        nested = value.get("image")
+        if isinstance(nested, str) or nested is None:
+            return nested
+        return None
+
+    return None
+
+
+def normalize_controlnet_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Fix common ControlNet payload incompatibilities between A1111 and Forge.
+
+    - If a ControlNet unit has "image" as a dict (e.g. {"mask": null} or
+      {"image": "<b64>", "mask": null}), convert it to Forge-friendly fields:
+        unit["image"] = "<b64>" or None
+        unit["mask"]  = <mask> (if present)
+    """
+    alwayson = payload.get("alwayson_scripts")
+    if not isinstance(alwayson, dict):
+        return payload
+
+    patched = payload.copy()
+    patched_alwayson = dict(alwayson)
+    changed = False
+
+    for script_name, script_cfg in list(patched_alwayson.items()):
+        if not isinstance(script_name, str) or "controlnet" not in script_name.lower():
+            continue
+        if not isinstance(script_cfg, dict):
+            continue
+
+        args = script_cfg.get("args")
+        if not isinstance(args, list):
+            continue
+
+        new_args = []
+        args_changed = False
+
+        for unit in args:
+            if not isinstance(unit, dict):
+                new_args.append(unit)
+                continue
+
+            new_unit = unit.copy()
+
+            if "image" in new_unit and isinstance(new_unit.get("image"), dict):
+                image_dict = new_unit.get("image") or {}
+                new_unit["image"] = _extract_base64_image(image_dict)
+
+                if "mask" in image_dict and "mask" not in new_unit:
+                    new_unit["mask"] = image_dict.get("mask")
+
+                args_changed = True
+
+            new_args.append(new_unit)
+
+        if args_changed:
+            new_script_cfg = script_cfg.copy()
+            new_script_cfg["args"] = new_args
+            patched_alwayson[script_name] = new_script_cfg
+            changed = True
+
+    if not changed:
+        return payload
+
+    patched["alwayson_scripts"] = patched_alwayson
+    return patched
 
 
 def wait_for_service() -> None:
@@ -180,6 +264,8 @@ def handler(job: Dict[str, Any]):
     try:
         wait_for_service()
         payload = job["input"]
+
+        payload = normalize_controlnet_payload(payload)
 
         # --- LCM acceleration patch ---
         if LCM_ENABLED:
