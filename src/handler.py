@@ -190,7 +190,7 @@ def start_webui() -> None:
 
     cmd_args = os.getenv(
         "COMMANDLINE_ARGS",
-        "--listen --enable-insecure-extension-access --no-half-vae --opt-sdp-attention --api"
+        "--listen --enable-insecure-extension-access --opt-sdp-attention --opt-channelslast --api"
     )
 
     python_path = "/workspace/stable-diffusion-webui/venv/bin/python"

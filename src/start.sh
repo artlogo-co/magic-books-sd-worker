@@ -17,6 +17,8 @@ export PYTHONUNBUFFERED=true
   --api \
   --nowebui \
   --skip-version-check \
+  --opt-channelslast \
+  --upcast-sampling \
   --no-hashing \
   --cuda-malloc \
   --no-download-sd-model &
