@@ -52,11 +52,6 @@ RUN wget -O models/VAE/sdxl-vae-fp16-fix.safetensors \
 
 ENV PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.9,max_split_size_mb:512
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4
-ENV COMMANDLINE_ARGS="--listen \
-    --enable-insecure-extension-access \
-    --cuda-malloc \
-    --vae-path /workspace/stable-diffusion-webui/models/VAE/sdxl-vae-fp16-fix.safetensors \
-    --api"
 
 WORKDIR /workspace
 COPY requirements.txt /workspace/requirements.txt

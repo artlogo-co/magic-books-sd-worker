@@ -8,18 +8,17 @@ export LD_PRELOAD="${TCMALLOC}"
 export PYTHONUNBUFFERED=true
 /workspace/stable-diffusion-webui/venv/bin/python /workspace/stable-diffusion-webui/webui.py \
   --xformers \
-  --no-half-vae \
   --skip-python-version-check \
   --skip-torch-cuda-test \
   --skip-install \
   --ckpt /workspace/stable-diffusion-webui/models/Stable-diffusion/realvisxlV50_v40Bakedvae.safetensors \
-  --opt-sdp-attention \
   --disable-safe-unpickle \
   --port 7860 \
   --api \
   --nowebui \
   --skip-version-check \
   --no-hashing \
+  --cuda-malloc \
   --no-download-sd-model &
 
 echo "Starting RunPod Handler"
